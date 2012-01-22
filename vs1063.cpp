@@ -2,122 +2,111 @@
 #include <SPI.h>
 #include "vs1063.h"
 
-void SPIPutChar(unsigned char data)
+// read the 16-bit value of a VS10xx register
+uint16_t vs_read_register(uint8_t address)
 {
-	SPDR =data;
-	while(!(SPSR & (1<<SPIF)));
+    uint16_t resultvalue = 0;
+    uint16_t aux = 0;
+    vs_deselect_data();
+    vs_select_control();
+    vs_wait();
+    SPI.transfer(VS_READ_COMMAND);
+    SPI.transfer(address);
+    aux = SPI.transfer(0xff);
+    resultvalue = aux << 8;
+    aux = SPI.transfer(0xff);
+    resultvalue |= aux;
+    vs_deselect_control();
+    vs_wait();
+    return resultvalue;
 }
 
-unsigned char SPIGetChar()
+// write VS10xx register
+void vs_write_register(uint8_t address, uint8_t highbyte, uint8_t lowbyte)
 {
-    unsigned char returned = SPI.transfer(0xFF);
-    return returned;            /* Return the received byte */
+    vs_deselect_data();
+    vs_select_control();
+    vs_wait();
+    delay(2);
+    SPI.transfer(VS_WRITE_COMMAND);
+    SPI.transfer(address);
+    SPI.transfer(highbyte);
+    SPI.transfer(lowbyte);
+    vs_deselect_control();
+    vs_wait();
 }
 
-void vs_deassert_xreset()
+// write VS10xx 16-bit SCI registers
+void vs_write_register(uint8_t address, uint16_t value)
 {
-   digitalWrite(VS_XRESET, HIGH);
+    uint8_t highbyte;
+    uint8_t lowbyte;
+
+    highbyte = (value & 0xff00) >> 8;
+    lowbyte = value & 0x00ff;
+    vs_write_register(address, highbyte, lowbyte);
 }
 
-void vs_assert_xreset()
+// read data rams
+uint16_t vs_read_wramaddr(uint16_t address)
 {
-   digitalWrite(VS_XRESET, LOW);
+    uint16_t rv = 0;
+    vs_write_register(SCI_WRAMADDR, address);
+    rv = vs_read_register(SCI_WRAM);
+    return rv;
 }
 
-/** Pull the VS10xx Control Chip Select line Low */
-void vs_SelectControl()
+// write to data rams
+void vs_write_wramaddr(uint16_t address, uint16_t value)
 {
-    digitalWrite(VS_XCS, LOW);
+    vs_write_register(SCI_WRAMADDR, address);
+    vs_write_register(SCI_WRAM, value);
 }
 
-/** Pull the VS10xx Control Chip Select line High */
-void vs_DeselectControl()
-{
-    digitalWrite(VS_XCS, HIGH);
-}
-
-/** Pull the VS10xx Data Chip Select line Low */
-void vs_SelectData()
-{
-    digitalWrite(VS_XDCS, LOW);
-}
-
-/** Pull the VS10xx Data Chip Select line High */
-void vs_DeselectData()
-{
-    digitalWrite(VS_XDCS, HIGH);
-}
-
+// wait for VS_DREQ to get HIGH before sending new data to SPI
 void vs_wait()
 {
     while (!digitalRead(VS_DREQ)) {
     };
 }
 
-/** Write VS10xx register */
-void vs_WriteRegister(uint8_t address, uint8_t highbyte, uint8_t lowbyte)
+// pull the VS10xx Control Chip Select line LOW
+void vs_select_control()
 {
-    vs_DeselectData();
-    vs_SelectControl();
-    delay(1);
-    SPI.transfer(0x02);         //write command
-    SPI.transfer(address);
-    SPI.transfer(highbyte);
-    SPI.transfer(lowbyte);
-    vs_wait();
-    vs_DeselectControl();
+    digitalWrite(VS_XCS, LOW);
 }
 
-/** Read the 16-bit value of a VS10xx register */
-uint16_t vs_ReadRegister(uint8_t address)
+// pull the VS10xx Control Chip Select line HIGH
+void vs_deselect_control()
 {
-    uint16_t resultvalue = 0;
-    uint16_t aux = 0;
-    vs_DeselectData();
-    vs_SelectControl();
-    SPI.transfer(0x03);         //read command
-    SPI.transfer(address);
-    aux = SPI.transfer(0xff);
-    vs_wait();
-    resultvalue = aux << 8;
-    SPI.transfer(0xff);
-    vs_wait();
-    resultvalue |= aux;
-    vs_DeselectControl();
-    return resultvalue;
+    digitalWrite(VS_XCS, HIGH);
 }
 
-/** Set VS10xx Volume Register */
-void vs_SetVolume(uint8_t leftchannel, uint8_t rightchannel)
+// pull the VS10xx Data Chip Select line LOW
+void vs_select_data()
 {
-    vs_WriteRegister(SPI_VOL, leftchannel, rightchannel);
+    digitalWrite(VS_XDCS, LOW);
 }
 
-/** Soft Reset of VS10xx (Between songs) */
-void vs_SoftReset()
+// pull the VS10xx Data Chip Select line HIGH
+void vs_deselect_data()
 {
-    vs_deassert_xreset();
-    // Newmode, Reset, No L1-2
-    vs_WriteRegister(SPI_MODE, 0x08, 0x04);
-    delay(1);
-    // wait for startup
-    while (!digitalRead(VS_DREQ)) ;
-    // Set clock register, doubler etc
-    vs_WriteRegister(SPI_CLOCKF, 0xb3, 0xfe);
-    //vs_WriteRegister(SPI_CLOCKF, 0xb8, 0x00);
-    delay(1);
-
-    //setup I2S (see page77 of the datasheet of vs1053 )
-    //set GPIO0 as output
-    vs_WriteRegister(SPI_WRAMADDR, 0xc0, 0x17);
-    vs_WriteRegister(SPI_WRAM, 0x00, 0xf0);
-    //enable I2S (MCLK enabled, 48kHz sample rate)
-    vs_WriteRegister(SPI_WRAMADDR, 0xc0, 0x40);
-    vs_WriteRegister(SPI_WRAM, 0x00, 0x0C);
-
-    while (!digitalRead(VS_DREQ)) ;
+    digitalWrite(VS_XDCS, HIGH);
 }
 
+// power up the VS10xx chip
+void vs_deassert_xreset()
+{
+    digitalWrite(VS_XRESET, HIGH);
+}
+
+// shutdown the VS10xx chip
+void vs_assert_xreset()
+{
+    digitalWrite(VS_XRESET, LOW);
+}
+
+// set up pins
 void vs_setup()
 {
     pinMode(VS_DREQ, INPUT);
@@ -129,4 +118,31 @@ void vs_setup()
     pinMode(10, OUTPUT);        //the SS of the SPI interface on the arduino board
 
     vs_deassert_xreset();
+    vs_wait();
 }
+
+// soft reset of VS10xx (between songs)
+void vs_soft_reset()
+{
+    vs_write_register(SCI_MODE, SM_SDINEW | SM_RESET);
+    // set SC_MULT=3.5x, SC_ADD=1.0x
+    vs_write_register(SCI_CLOCKF, 0x8800);
+    vs_wait();
+}
+
+// setup I2S (see page77 of the datasheet of vs1053 )
+// also enables blinky lights on the simple dsp evaluation board
+void vs_setup_i2s()
+{
+    //set GPIO0 as output
+    vs_write_wramaddr(0xc017, 0x00f0);
+    //enable I2S (MCLK enabled, 48kHz sample rate)
+    vs_write_wramaddr(0xc040, 0x000c);
+}
+
+// Set VS10xx Volume Register
+void vs_set_volume(uint8_t leftchannel, uint8_t rightchannel)
+{
+    vs_write_register(SCI_VOL, leftchannel, rightchannel);
+}
+

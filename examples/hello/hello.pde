@@ -4,7 +4,7 @@
 #include <SPI.h>
 #include "vs1063.h"
 
-unsigned char HelloMP3[] = {
+unsigned char hello_mp3[] = {
     0xFF, 0xF2, 0x40, 0xC0, 0x19, 0xB7, 0x00, 0x14, 0x02, 0xE6, 0x5C,   /* ..@.......\ */
     0x01, 0x92, 0x68, 0x01, 0xF1, 0x5E, 0x03, 0x08, 0xF0, 0x24, 0x80,   /* ..h..^...$. */
     0x05, 0x9E, 0x20, 0xC6, 0xFC, 0x12, 0x32, 0x5C, 0xBF, 0xF9, 0xB9,   /* .. ...2\... */
@@ -169,21 +169,16 @@ void setup()
     SPI.begin();
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
-    //max SDI clock freq = CLKI/7 and (datasheet) CLKI = 36.864, hence max clock = 5MHz
-    //SPI clock arduino = 16MHz. 16/ 4 = 4MHz -- ok!
 
     //initialize chip 
-    vs_DeselectControl();
-    vs_DeselectData();
-    vs_SetVolume(0xff, 0xff);   //Declick: Immediately switch analog off
-    /* Declick: Slow sample rate for slow analog part startup */
-    vs_WriteRegister(SPI_AUDATA, 0, 10);        /* 10 Hz */
-    delay(100);
-    /* Switch on the analog parts */
-    vs_SetVolume(0xfe, 0xfe);
-    vs_WriteRegister(SPI_AUDATA, 31, 64);       /* 8kHz */
-    vs_SetVolume(20, 20);       // Set initial volume (20 = -10dB)
-    vs_SoftReset();
+    vs_deselect_control();
+    vs_deselect_data();
+    vs_set_volume(0xfe, 0xfe);
+    vs_write_register(SCI_AUDATA, 0, 10);        // 10 Hz
+    delay(10);
+    vs_write_register(SCI_AUDATA, 31, 64);       // 8kHz
+    vs_set_volume(20, 20);       // Set initial volume (20 = -10dB)
+    vs_soft_reset();
 }
 
 void InitMicrocontroller()
@@ -206,28 +201,30 @@ void loop()
     //InitMicrocontroller();
     //SPIInit();
 
-    p = &HelloMP3[0];           // Point "p" to the beginning of array
-    while (p <= &HelloMP3[sizeof(HelloMP3) - 1]) {
+    p = &hello_mp3[0];           // Point "p" to the beginning of array
+    while (p <= &hello_mp3[sizeof(hello_mp3) - 1]) {
         while (!digitalRead(VS_DREQ)) {
             // MP3 buffer is full, time to do something else...
             vs_wait();          // Wait until SPI transfer is completed
-            vs_DeselectData();  // Release the SDI bus
+            vs_deselect_data();  // Release the SDI bus
             // You can do something else here, the bus is free...
             // Maybe set the volume or whatever...
         }
-        vs_SelectData();        // Pull XDCS low
+        vs_select_data();        // Pull XDCS low
         SPI.transfer(*p++);     // Send SPI byte
         // You can actually send 32 bytes here before checking for DREQ again
     }
 
     // End of file - send 2048 zeros before next file
-    vs_SelectData();
+    vs_select_data();
     for (i = 0; i < 2048; i++) {
         while (!digitalRead(VS_DREQ)) ; // wait here until DREQ is high again
         SPI.transfer(0);
     }
     vs_wait();                  // Wait until SPI transfer is completed
-    vs_DeselectData();
-    vs_SoftReset();
+    vs_deselect_data();
+    vs_soft_reset();
+
+    delay(2000);
 }
 
