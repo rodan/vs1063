@@ -137,12 +137,13 @@ void vs_setup_i2s()
     //set GPIO0 as output
     vs_write_wramaddr(0xc017, 0x00f0);
     //enable I2S (MCLK enabled, 48kHz sample rate)
-    vs_write_wramaddr(0xc040, 0x000c);
+    vs_write_wramaddr(0xc040, 0x000c); // I2S_CF_MCLK_ENA | I2S_CF_ENA
 }
 
-// Set VS10xx Volume Register
+// set VS10xx volume attenuation    0x00 lound - 0xfe silent
 void vs_set_volume(uint8_t leftchannel, uint8_t rightchannel)
 {
+    // volume = dB/0.5
     vs_write_register(SCI_VOL, leftchannel, rightchannel);
 }
 
