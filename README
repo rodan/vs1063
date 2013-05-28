@@ -1,6 +1,11 @@
 
 Arduino library for VLSI's VS1063 - MP3 / OGG / AAC / WMA / FLAC / G.711 / G.722 Audio Codec
 
+datasheets and online shop available at http://www.vlsi.fi/en/products/vs1063.html
 
-more info at http://www.vlsi.fi/en/products/vs1063.html
+
+a more feature-packed and generic version of the vs1063 library is available here:
+
+https://github.com/rodan/playa/blob/master/avr/drivers/vs1063.c
+https://github.com/rodan/playa/blob/master/avr/drivers/vs1063.h
 

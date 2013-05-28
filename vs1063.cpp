@@ -98,12 +98,14 @@ void vs_deselect_data()
 void vs_deassert_xreset()
 {
     digitalWrite(VS_XRESET, HIGH);
+    delay(200); // wait for the cap to charge
 }
 
 // shutdown the VS10xx chip
 void vs_assert_xreset()
 {
     digitalWrite(VS_XRESET, LOW);
+    delay(200); // wait for the cap to discharge
 }
 
 // set up pins
